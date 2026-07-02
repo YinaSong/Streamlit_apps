@@ -31,22 +31,9 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# 读取数据
-from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
 
-st.write("BASE_DIR:", BASE_DIR)
-st.write("DATA_DIR:", DATA_DIR)
-st.write("DATA_DIR exists:", DATA_DIR.exists())
-
-file_path = DATA_DIR / "20260629_Bullet Cameras_售出件数趋势.xlsx"
-
-st.write("File:", file_path)
-st.write("File exists:", file_path.exists())
-
-unit_seller = pd.read_excel(file_path)
+unit_seller = pd.read_excel("data/20260629_Bullet Cameras_售出件数趋势.xlsx")
 BASE_DIR = Path(__file__).parent
 
 ROOT = BASE_DIR.parent.parent
