@@ -34,13 +34,6 @@ st.markdown(
 
 
 unit_seller = pd.read_excel("data/20260629_Bullet Cameras_售出件数趋势.xlsx")
-BASE_DIR = Path(__file__).parent
-
-ROOT = BASE_DIR.parent.parent
-
-DATA_DIR = ROOT / "data"
-
-unit_seller = pd.read_excel(DATA_DIR / "20260629_Bullet Cameras_售出件数趋势.xlsx")
 
 # 清洗日期列，去除()
 unit_seller["日期"] = unit_seller["日期"].str.replace("()", "", regex=False)
