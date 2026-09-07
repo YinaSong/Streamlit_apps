@@ -1,53 +1,68 @@
+"""BSR 关键词分析。"""
 import streamlit as st
-import pandas as pd
 
+from utils import charts, formatters as fmt, kpi as kpi_mod
+from utils.data_loader import load_all
+from components import ui
 
-#页面基本设置
-st.set_page_config(page_title="BSR关键词分析", page_icon=":bar_chart:", layout="wide")
+ui.page_title("BSR 关键词分析")
 
-st.title("BSR关键词分析")
+data = load_all()
+kw = data["keyword"]
+wc = data["wordcloud"]
 
-df_keywords = pd.read_excel("./data/BSR相关关键词.xlsx")
+# ---- KPI ----
+k = kpi_mod.keyword_kpis(kw)
+ui.kpi_cards([
+    {"label": "关键词数量", "value": fmt.thousands(k["关键词数量"])},
+    {"label": "平均月搜索量", "value": fmt.compact(k["平均月搜索量"])},
+    {"label": "平均竞品数量", "value": fmt.thousands(k["平均竞品数量"])},
+    {"label": "平均CPC", "value": fmt.usd(k["平均CPC($)"])},
+])
 
+# ---- 搜索量排行 / 分布 ----
+ui.section("1. 搜索量排行与分布")
+c1, c2 = st.columns(2)
+with c1:
+    d = kw.nlargest(20, "月搜索量")
+    charts.hbar(d, x="月搜索量", y="关键词", title="Top20 关键词月搜索量")
+with c2:
+    charts.histogram(kw, x="月搜索量", title="月搜索量分布", nbins=40)
 
-st.markdown(
-    """
-    <div style="
-        background-color:#f5f5f5;
-        border-left:4px solid #d9d9d9;
-        padding:12px 16px;
-        border-radius:8px;
-        color:#666666;
-        font-size:14px;
-        line-height:1.8;
-    ">
-    💡 <b>使用说明</b><br>
-    • 所有图表可以放大查看，鼠标悬停可查看详细数据。<br>
-    • 右上角提供下载按钮，可导出为图片或 PDF。<br>
-    • 支持拖动坐标轴范围进行缩放查看。
-    </div>
-    """,
-    unsafe_allow_html=True
+# ---- 搜索量 vs 竞争度 ----
+ui.section("2. 搜索量 vs 竞争度")
+c3, c4 = st.columns(2)
+with c3:
+    charts.scatter(kw, x="竞品数量", y="月搜索量", hover_name="关键词",
+                   title="竞品数量 vs 搜索量")
+with c4:
+    d = kw.nlargest(50, "月搜索量")
+    charts.treemap(d, path="关键词", values="月搜索量", title="Top50 关键词搜索量 Treemap")
+
+# ---- 词云 ----
+ui.section("3. 流量圈词云（重复次数 Treemap）")
+if len(wc) > 0:
+    wc_top = wc.nlargest(40, "重复次数")
+    charts.treemap(wc_top, path="关键词", values="重复次数", title="词云关键词重复次数")
+else:
+    st.info("无词云数据")
+
+# ---- 原始数据 ----
+ui.section("4. 原始数据表")
+cols = ["关键词", "旺季", "月搜索量", "年搜索量-2026年", "cpc精准竞价($)", "竞品数量",
+        "周搜索排名", "90天购买量", "词搜索量复合增长率-近3个月(%)", "曝光点击垄断性(%)"]
+st.dataframe(
+    kw[cols],
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "月搜索量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
+        "年搜索量-2026年": st.column_config.NumberColumn(format=fmt.NUM_FMT),
+        "cpc精准竞价($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "竞品数量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
+        "周搜索排名": st.column_config.NumberColumn(format=fmt.NUM_FMT),
+        "90天购买量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
+        "词搜索量复合增长率-近3个月(%)": st.column_config.NumberColumn(format=fmt.PCT_FMT),
+        "曝光点击垄断性(%)": st.column_config.NumberColumn(format=fmt.PCT_FMT),
+    },
 )
-
-st.subheader("1.原始数据表")
-if st.checkbox("查看原始BSR关键词数据表"):
-    st.markdown(
-        "数据表中包含了BSR关键词的相关信息"
-    )
-    st.markdown(">注：此处排序是按照月搜索量从大到小排序，如果需要对利用其它指标排序，请在数据表中点击对应列标题进行排序即可。\n"
-                ">鼠标悬停在表格上，右下角提供筛选字段功能、下载功能、搜索功能")
-    st.dataframe(
-        df_keywords,
-        use_container_width=True,
-        column_config={
-            "月搜索量": st.column_config.NumberColumn(format="%,.0f"),
-            "年搜索量-2026年": st.column_config.NumberColumn(format="%,.2f"),
-            "年搜索量-2025年": st.column_config.NumberColumn(format="%,.2f"),
-            "年搜索量-2024年": st.column_config.NumberColumn(format="%,.2f"),
-            "竞品数量": st.column_config.NumberColumn(format="%,.0f"),
-            "词搜索量复合增长率(%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "曝光点击/转化(%)": st.column_config.NumberColumn(format="%.2f%%"),
-        }
-    )
-st.divider()
