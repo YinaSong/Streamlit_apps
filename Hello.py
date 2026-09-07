@@ -105,7 +105,7 @@ top20 = detail.nlargest(20, "预计Listing月销量")[
 ]
 st.dataframe(
     top20,
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "URL": st.column_config.LinkColumn("链接", display_text="Amazon ↗"),

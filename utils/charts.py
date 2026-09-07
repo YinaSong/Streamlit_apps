@@ -87,11 +87,14 @@ def histogram(df, x, title=None, nbins=None, height=None):
         st.info("无数据")
         return
     bins = nbins or 30
-    counts, edges = np.histogram(s, bins=bins)
     if pd.api.types.is_datetime64_any_dtype(s):
-        edges_dt = pd.to_datetime(edges)
+        # numpy 2.x 无法直接对 datetime64 分箱，先转成整数纳秒再分箱。
+        ns = s.astype("int64").to_numpy()
+        counts, edges = np.histogram(ns, bins=bins)
+        edges_dt = pd.to_datetime(edges.astype("int64"), unit="ns")
         labels = [e.strftime("%Y-%m") for e in edges_dt[:-1]]
     else:
+        counts, edges = np.histogram(s, bins=bins)
         labels = [f"{edges[i]:,.0f}–{edges[i + 1]:,.0f}" for i in range(len(counts))]
     hist = pd.DataFrame({"区间": labels, "数量": counts})
     st.bar_chart(hist, x="区间", y="数量", height=height or theme.CHART_HEIGHT)

@@ -53,7 +53,7 @@ cols = ["关键词", "旺季", "月搜索量", "年搜索量-2026年", "cpc精�
         "周搜索排名", "90天购买量", "词搜索量复合增长率-近3个月(%)", "曝光点击垄断性(%)"]
 st.dataframe(
     kw[cols],
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "月搜索量": st.column_config.NumberColumn(format=fmt.NUM_FMT),

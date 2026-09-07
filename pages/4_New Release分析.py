@@ -63,7 +63,7 @@ cols = ["产品名称", "ASIN", "品牌", "店铺", "实际价格($)", "预计Li
         "评分星级", "评价数量", "上架时间", "上架天数", "国籍/地区"]
 st.dataframe(
     detail[cols],
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "实际价格($)": st.column_config.NumberColumn(format=fmt.USD_FMT),

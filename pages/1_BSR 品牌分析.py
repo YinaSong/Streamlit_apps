@@ -55,7 +55,7 @@ with c6:
 ui.section("4. 原始数据表")
 st.dataframe(
     brand,
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "品牌产品listing月销量": st.column_config.NumberColumn(format=fmt.NUM_FMT),

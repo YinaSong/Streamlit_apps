@@ -116,4 +116,4 @@ col_config = {
     c: st.column_config.NumberColumn(format=fmt.NUM_FMT if c in _int_cols else fmt.NUM_FMT_2)
     for c in mt.columns if c != "月份"
 }
-st.dataframe(mt, use_container_width=True, hide_index=True, column_config=col_config)
+st.dataframe(mt, width="stretch", hide_index=True, column_config=col_config)

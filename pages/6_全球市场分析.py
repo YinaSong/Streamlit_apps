@@ -50,7 +50,7 @@ with c4:
 ui.section("3. 站点概览表")
 st.dataframe(
     g[["站点", "相似类目", "货币", "Top100月销量", "Top100月销额", "垄断系数", "新品占比"]],
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     column_config={
         "Top100月销量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
