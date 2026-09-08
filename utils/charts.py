@@ -58,10 +58,15 @@ def _echarts(options: dict, height: int | None = None, key: str | None = None):
 # Streamlit 原生图表
 # ---------------------------------------------------------------------------
 
-def line(df, x, y, title=None, y2=None, height=None):
-    """折线图；y 可为单列名或列名列表。y2 传入时切换为 ECharts 双轴。"""
+def line(df, x, y, title=None, y2=None, height=None, y_range=None):
+    """折线图；y 可为单列名或列名列表。y2 传入时切换为 ECharts 双轴。
+
+    y_range=(min, max) 时固定纵轴范围（此时改走 ECharts 渲染）。
+    """
     if y2:
         return dual_line(df, x, y, y2, title=title, height=height)
+    if y_range:
+        return _line_echarts(df, x, y, title=title, height=height, y_range=y_range)
     _title(title)
     ys = list(y) if isinstance(y, list) else [y]
     d = df[[x] + ys]
@@ -80,7 +85,11 @@ def bar(df, x, y, title=None, height=None):
 
 
 def histogram(df, x, title=None, nbins=None, height=None):
-    """直方图：numpy 分箱后交给 st.bar_chart。"""
+    """直方图：numpy 分箱后交给 ECharts 纵向柱状图（保持区间顺序）。
+
+    st.bar_chart 默认会对字符串 x 轴按字母序排序，导致「100–200」排到
+    「20–30」之前；改用 ECharts 分类轴后按分箱顺序原样展示。
+    """
     _title(title)
     s = df[x].dropna()
     if len(s) == 0:
@@ -92,17 +101,53 @@ def histogram(df, x, title=None, nbins=None, height=None):
         ns = s.astype("int64").to_numpy()
         counts, edges = np.histogram(ns, bins=bins)
         edges_dt = pd.to_datetime(edges.astype("int64"), unit="ns")
-        labels = [e.strftime("%Y-%m") for e in edges_dt[:-1]]
+        span_days = (edges_dt[-1] - edges_dt[0]).days
+        # 时间跨度短时用「日」粒度，避免多月落到同一标签造成重复
+        fmt = "%Y-%m-%d" if span_days <= 200 else "%Y-%m"
+        labels = [e.strftime(fmt) for e in edges_dt[:-1]]
     else:
         counts, edges = np.histogram(s, bins=bins)
         labels = [f"{edges[i]:,.0f}–{edges[i + 1]:,.0f}" for i in range(len(counts))]
-    hist = pd.DataFrame({"区间": labels, "数量": counts})
-    st.bar_chart(hist, x="区间", y="数量", height=height or theme.CHART_HEIGHT)
+    options = {
+        "tooltip": _tooltip("axis"),
+        "grid": {"left": "3%", "right": "4%", "bottom": "10%", "containLabel": True},
+        "xAxis": {"type": "category", "data": labels, "axisLabel": {"rotate": 45}},
+        "yAxis": {"type": "value", "axisLabel": {"formatter": _num_js()}},
+        "series": [{
+            "type": "bar",
+            "data": [int(c) for c in counts],
+            "itemStyle": {"color": theme.PRIMARY},
+            "barMaxWidth": 24,
+        }],
+    }
+    _echarts(options, height)
 
 
 # ---------------------------------------------------------------------------
 # ECharts 图表
 # ---------------------------------------------------------------------------
+
+def _line_echarts(df, x, y, title=None, height=None, y_range=None):
+    """单轴折线（ECharts）：用于需要固定纵轴范围（如星级 3–5）的场景。"""
+    _title(title)
+    ys = list(y) if isinstance(y, list) else [y]
+    axis = {"type": "value", "axisLabel": {"formatter": _num_js()}}
+    if y_range:
+        axis["min"], axis["max"] = y_range
+    options = {
+        "tooltip": _tooltip("axis"),
+        "legend": {"data": ys, "top": 0},
+        "grid": {"left": "3%", "right": "5%", "bottom": "8%", "containLabel": True},
+        "xAxis": {"type": "category", "data": df[x].astype(str).tolist()},
+        "yAxis": axis,
+        "series": [
+            {"name": c, "type": "line", "smooth": True, "data": _vals(df[c]),
+             "lineStyle": {"color": col}, "itemStyle": {"color": col}}
+            for c, col in zip(ys, theme.ECHARTS_COLORS)
+        ],
+    }
+    _echarts(options, height)
+
 
 def dual_line(df, x, y, y2, title=None, height=None):
     """双轴折线：左轴 y、右轴 y2。"""

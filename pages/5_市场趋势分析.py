@@ -98,7 +98,7 @@ c3, c4 = st.columns(2)
 with c3:
     charts.line(view, x="月份", y="平均售价", title="平均售价趋势")
 with c4:
-    charts.line(view, x="月份", y="平均星级", title="平均星级趋势")
+    charts.line(view, x="月份", y="平均星级", title="平均星级趋势", y_range=(3, 5))
 charts.line(view, x="月份", y="平均评价", title="平均评价趋势")
 
 # ---- 模块 F：竞争格局 ----

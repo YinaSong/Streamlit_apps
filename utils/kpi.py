@@ -4,6 +4,9 @@
 """
 from __future__ import annotations
 
+import re
+from collections import Counter, defaultdict
+
 import pandas as pd
 
 
@@ -142,3 +145,145 @@ def seasonality_matrix(df: pd.DataFrame, month_col: str = "月份",
             row.append(float(v.iloc[0]) if len(v) else None)
         matrix.append(row)
     return years, months, matrix
+
+
+# ---------------------------------------------------------------------------
+# 分析聚合：品牌/店铺价格定位、集中度、价格/评分区间、标题与属性词频
+# （供各页新增图表使用，纯计算，无 UI 依赖）
+# ---------------------------------------------------------------------------
+
+_STOPWORDS = {
+    "a", "an", "the", "and", "or", "for", "with", "of", "to", "in", "on", "by",
+    "is", "are", "was", "were", "be", "been", "being", "as", "at", "from", "into",
+    "than", "that", "this", "these", "those", "it", "its", "your", "you", "our",
+    "their", "will", "can", "may", "also", "up", "out", "no", "not", "per", "via",
+    "use", "used", "using", "etc", "com", "amazon", "https", "http",
+}
+
+
+def _words(text) -> list[str]:
+    """英文文本 -> 小写分词（去除停用词与过短词）。"""
+    if pd.isna(text):
+        return []
+    t = str(text).lower()
+    return [w for w in re.findall(r"[a-z0-9][a-z0-9\-.']*", t)
+            if w not in _STOPWORDS and len(w) > 1]
+
+
+def _word_metrics(df, text_cols, sales_col, bigram=False, top=50) -> pd.DataFrame:
+    """从若干文本列提取 词频 / 覆盖产品数 / 词月销量（英文分词）。"""
+    freq: Counter = Counter()
+    products: Counter = Counter()
+    sales: defaultdict = defaultdict(float)
+    has_sales = sales_col in df.columns
+    for _, row in df.iterrows():
+        parts = [str(row[c]) for c in text_cols if c in df.columns and pd.notna(row[c])]
+        tokens = _words(" ".join(parts))
+        if bigram:
+            tokens = [f"{tokens[i]} {tokens[i + 1]}" for i in range(len(tokens) - 1)]
+        seen: set = set()
+        for t in tokens:
+            freq[t] += 1
+            if t not in seen:
+                seen.add(t)
+                products[t] += 1
+                if has_sales:
+                    v = row[sales_col]
+                    if pd.notna(v):
+                        sales[t] += float(v)
+    items = sorted(freq.items(), key=lambda kv: -kv[1])[:top]
+    return pd.DataFrame({
+        "词": [t for t, _ in items],
+        "词频": [freq[t] for t, _ in items],
+        "覆盖产品数": [products[t] for t, _ in items],
+        "词月销量": [sales[t] for t, _ in items],
+    })
+
+
+def title_words(df, title_col="产品名称", sales_col="预计Listing月销量", top=50):
+    """标题分词词频（词云）。"""
+    return _word_metrics(df, [title_col], sales_col, bigram=False, top=top)
+
+
+def title_bigrams(df, title_col="产品名称", sales_col="预计Listing月销量", top=50):
+    """标题二元词组词频。"""
+    return _word_metrics(df, [title_col], sales_col, bigram=True, top=top)
+
+
+def attr_words(df, text_cols, sales_col="预计Listing月销量", top=30):
+    """属性词挖掘：从五点描述/属性列提取词频与销量。"""
+    return _word_metrics(df, text_cols, sales_col, bigram=False, top=top)
+
+
+def _asp_stats(df, name_col, price_col="实际价格($)", sales_col="预计Listing月销量"):
+    """按某维度（品牌/店铺）聚合：ASIN 数、平均售价、月销量。"""
+    g = df.dropna(subset=[name_col, price_col])
+    out = g.groupby(name_col).agg(
+        平均售价=(price_col, "mean"),
+        ASIN数=(price_col, "count"),
+        月销量=(sales_col, "sum"),
+    ).reset_index()
+    out["平均售价"] = out["平均售价"].round(2)
+    out["月销量"] = out["月销量"].fillna(0).astype(float)
+    return out
+
+
+def brand_asp(df, name_col="品牌", price_col="实际价格($)", sales_col="预计Listing月销量"):
+    """品牌 ASP（平均售价）与规模排行。"""
+    out = _asp_stats(df, name_col, price_col, sales_col)
+    return out.sort_values("平均售价", ascending=False).reset_index(drop=True)
+
+
+def seller_stats(df, name_col="店铺", price_col="实际价格($)", sales_col="预计Listing月销量"):
+    """店铺（卖家）聚合：ASIN 数、平均售价、月销量与占比。"""
+    out = _asp_stats(df, name_col, price_col, sales_col)
+    out = out.sort_values("月销量", ascending=False).reset_index(drop=True)
+    total = out["月销量"].sum()
+    out["销量占比%"] = (out["月销量"] / total * 100).round(1) if total else 0.0
+    return out
+
+
+def listing_concentration(df, value_col="预计Listing月销量"):
+    """Top N listing 累计销量份额（快照）。"""
+    s = df[value_col].dropna().sort_values(ascending=False)
+    total = s.sum()
+    if not total:
+        return pd.DataFrame(columns=["TopN", "累计份额%"])
+    out = []
+    for n in (1, 3, 5, 10, 20):
+        n = min(n, len(s))
+        share = s.head(n).sum() / total * 100
+        out.append({"TopN": f"Top {n}", "累计份额%": round(float(share), 1)})
+    return pd.DataFrame(out)
+
+
+def price_bands(df, price_col="实际价格($)", sales_col="预计Listing月销量"):
+    """价格区间分布（ASIN 数 + 月销量）。"""
+    s = df[price_col].dropna()
+    bins = [0, 25, 50, 100, 150, 250, float("inf")]
+    labels = ["$0–25", "$25–50", "$50–100", "$100–150", "$150–250", "$250+"]
+    band = pd.cut(s, bins=bins, labels=labels, right=False)
+    d = pd.DataFrame({"价格区间": band, "销量": df.loc[s.index, sales_col]})
+    out = d.groupby("价格区间", observed=True).agg(
+        ASIN数=("销量", "size"),
+        月销量=("销量", "sum"),
+    ).reset_index()
+    out["月销量"] = out["月销量"].fillna(0)
+    return out[out["ASIN数"] > 0].reset_index(drop=True)
+
+
+def rating_bands(df, rating_col="评分星级"):
+    """评分区间分布（ASIN 数）。"""
+    s = df[rating_col].dropna()
+    bins = [3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
+    labels = ["3.0–3.5", "3.5–4.0", "4.0–4.5", "4.5–5.0", "5.0"]
+    band = pd.cut(s, bins=bins, labels=labels, right=False)
+    out = band.value_counts(sort=False).rename_axis("评分区间").reset_index(name="ASIN数")
+    return out[out["ASIN数"] > 0].reset_index(drop=True)
+
+
+def categorical_share(df, col):
+    """分类列 -> 各类别 ASIN 数（供环形图）。"""
+    vc = df[col].astype(str).str.strip().value_counts().reset_index()
+    vc.columns = ["类别", "ASIN数"]
+    return vc

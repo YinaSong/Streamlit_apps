@@ -47,8 +47,19 @@ if len(wc) > 0:
 else:
     st.info("无词云数据")
 
+# ---- 标题词分析 ----
+ui.section("4. 标题词分析（从 Top100 标题挖词）")
+detail = data["asin"]["detail"]
+tw = kpi_mod.title_words(detail)
+tb = kpi_mod.title_bigrams(detail)
+c5, c6 = st.columns(2)
+with c5:
+    charts.treemap(tw.head(40), path="词", values="词频", title="标题高频词 Treemap")
+with c6:
+    charts.hbar(tb.head(20), x="词频", y="词", title="标题高频词组（bigram）Top20")
+
 # ---- 原始数据 ----
-ui.section("4. 原始数据表")
+ui.section("5. 原始数据表")
 cols = ["关键词", "旺季", "月搜索量", "年搜索量-2026年", "cpc精准竞价($)", "竞品数量",
         "周搜索排名", "90天购买量", "词搜索量复合增长率-近3个月(%)", "曝光点击垄断性(%)"]
 st.dataframe(

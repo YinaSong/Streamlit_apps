@@ -51,8 +51,19 @@ with c5:
 with c6:
     charts.pareto(brand, x="品牌名称", y="品牌产品listing月销量", title="品牌销量帕累托图")
 
+# ---- 品牌价格定位 ----
+ui.section("4. 品牌价格定位（ASP）")
+asp = kpi_mod.brand_asp(data["asin"]["detail"])
+c7, c8 = st.columns(2)
+with c7:
+    charts.hbar(asp[asp["ASIN数"] >= 2].nlargest(15, "平均售价"),
+                x="平均售价", y="品牌", title="品牌平均售价 ASP（Top15）")
+with c8:
+    charts.scatter(asp, x="ASIN数", y="平均售价", size="月销量", hover_name="品牌",
+                   title="品牌价格定位（气泡=月销量）")
+
 # ---- 原始数据 ----
-ui.section("4. 原始数据表")
+ui.section("5. 原始数据表")
 st.dataframe(
     brand,
     width="stretch",

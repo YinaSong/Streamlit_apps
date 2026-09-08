@@ -55,8 +55,53 @@ charts.scatter(
     size="单个产品毛利率(%)", title="销量 vs 毛利（气泡=毛利率）",
 )
 
+# ---- 销量集中度 ----
+ui.section("4. 销量集中度（Listing 垄断）")
+conc = kpi_mod.listing_concentration(detail, "预计Listing月销量")
+charts.hbar(conc, x="累计份额%", y="TopN", title="Top N Listing 累计销量份额（%）")
+
+# ---- 价格 / 评分区间 ----
+ui.section("5. 价格区间 & 评分区间")
+c7, c8 = st.columns(2)
+with c7:
+    charts.donut(kpi_mod.price_bands(detail), names="价格区间", values="ASIN数",
+                 title="价格区间 ASIN 数占比")
+with c8:
+    rat = kpi_mod.rating_bands(detail).sort_values("ASIN数", ascending=False)
+    charts.hbar(rat, x="ASIN数", y="评分区间", title="评分星级分布")
+
+# ---- 店铺（卖家）对比 ----
+ui.section("6. 店铺（卖家）对比")
+seller = kpi_mod.seller_stats(detail)
+c9, c10 = st.columns(2)
+with c9:
+    charts.scatter(seller, x="ASIN数", y="平均售价", size="月销量", hover_name="店铺",
+                   title="店铺价格定位（x=ASIN数 · 气泡=月销量）")
+with c10:
+    charts.hbar(seller.head(15), x="月销量", y="店铺", title="店铺月销量 Top15")
+
+# ---- ASIN 装修 & 卖家属性 ----
+ui.section("7. ASIN 装修 & 卖家属性")
+r1 = st.columns(3)
+with r1[0]:
+    charts.donut(kpi_mod.categorical_share(detail, "物流方式"), names="类别", values="ASIN数",
+                 title="物流方式", height=300)
+with r1[1]:
+    charts.donut(kpi_mod.categorical_share(detail, "A+"), names="类别", values="ASIN数",
+                 title="A+ 页面", height=300)
+with r1[2]:
+    charts.donut(kpi_mod.categorical_share(detail, "主图视频"), names="类别", values="ASIN数",
+                 title="主图视频", height=300)
+r2 = st.columns(2)
+with r2[0]:
+    charts.donut(kpi_mod.categorical_share(detail, "是否做品牌旗舰店"), names="类别", values="ASIN数",
+                 title="品牌旗舰店", height=300)
+with r2[1]:
+    charts.donut(kpi_mod.categorical_share(detail, "BBX卖家属性"), names="类别", values="ASIN数",
+                 title="卖家属性（自营/第三方）", height=300)
+
 # ---- 原始数据 ----
-ui.section("4. 原始数据表")
+ui.section("8. 原始数据表")
 cols = ["产品名称", "ASIN", "品牌", "实际价格($)", "预计Listing月销量", "Listing月销售额($)",
         "评分星级", "评价数量", "上架时间", "上架天数", "单个产品毛利($)", "单个产品毛利率(%)"]
 st.dataframe(

@@ -27,8 +27,9 @@ ui.kpi_cards([
 ui.section("1. 新品销量排行与上架节奏")
 c1, c2 = st.columns(2)
 with c1:
-    d = detail.nlargest(15, "预计Listing月销量")
-    charts.hbar(d, x="预计Listing月销量", y="产品名称", title="新品销量 Top15")
+    d = detail.nlargest(15, "预计Listing月销量").copy()
+    d["品牌 · ASIN"] = d["品牌"].fillna("—").astype(str) + " · " + d["ASIN"].astype(str)
+    charts.hbar(d, x="预计Listing月销量", y="品牌 · ASIN", title="新品销量 Top15")
 with c2:
     charts.histogram(detail, x="上架时间", title="上架时间分布", nbins=20)
 
@@ -57,8 +58,21 @@ with c5:
 with c6:
     charts.hbar(seller_cnt.head(15), x="新品数量", y="店铺", title="卖家新品数量 Top15")
 
+# ---- 属性词挖掘 ----
+ui.section("4. 属性词挖掘（新品卖点/属性）")
+attr_cols = ["五点描述", "Special Feature", "Connectivity Technology",
+             "Indoor/Outdoor Usage", "Recommended Uses For Product"]
+attr = kpi_mod.attr_words(detail, attr_cols)
+c7, c8 = st.columns(2)
+with c7:
+    charts.hbar(attr.nlargest(15, "覆盖产品数"), x="覆盖产品数", y="词",
+                title="属性词覆盖新品数 Top15")
+with c8:
+    charts.hbar(attr.nlargest(15, "词月销量"), x="词月销量", y="词",
+                title="属性词关联月销量 Top15")
+
 # ---- 原始数据 ----
-ui.section("4. 原始数据表")
+ui.section("5. 原始数据表")
 cols = ["产品名称", "ASIN", "品牌", "店铺", "实际价格($)", "预计Listing月销量", "Listing月销售额($)",
         "评分星级", "评价数量", "上架时间", "上架天数", "国籍/地区"]
 st.dataframe(
