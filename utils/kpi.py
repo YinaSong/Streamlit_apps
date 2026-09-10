@@ -287,3 +287,17 @@ def categorical_share(df, col):
     vc = df[col].astype(str).str.strip().value_counts().reset_index()
     vc.columns = ["类别", "ASIN数"]
     return vc
+
+
+def competition_ratio(s: pd.Series) -> pd.Series:
+    """竞争度列 '255 / 81（3.15）' -> 数值 3.15（前两数之商，即竞争度比值）。"""
+    def _parse(v):
+        if pd.isna(v):
+            return None
+        m = re.search(r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", str(v))
+        if not m:
+            return None
+        b = float(m.group(2))
+        return round(float(m.group(1)) / b, 2) if b else None
+
+    return s.map(_parse)
