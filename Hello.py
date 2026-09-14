@@ -1,16 +1,22 @@
-"""Bullet Cameras 类目分析 —— 市场总览。"""
+"""Bullet Cameras 类目分析 —— 市场总览（多站点）。"""
 import streamlit as st
 
 from utils import charts, formatters as fmt, kpi as kpi_mod
 from utils.data_loader import load_all
 from components import ui
 
-ui.page_title(
-    "Bullet Cameras 市场总览",
-    "数据来源：Sorftime 专业版导出（类目：Tools & Home Improvement → Bullet Cameras）",
+ui.page_title("Bullet Cameras 市场总览")
+
+site = ui.site_selector()
+data = load_all(site)
+cur = data["currency"]
+cfmt = data["currency_fmt"]
+meta = data["market_meta"]
+
+st.caption(
+    f"数据来源：Sorftime 专业版导出（{meta.get('一级大类', '—')} → {meta.get('类目名称', '—')} · 站点 {site}）"
 )
 
-data = load_all()
 asin_summary = kpi_mod.summary_kpis(data["asin"]["summary"])
 dt = data["data_time"]
 
@@ -21,11 +27,12 @@ if dt.get("sales_latest"):
 src += "（注：最近月份数据可能未完整统计）"
 ui.data_source(src)
 
-# 销量趋势（按时间升序，附「月份」标签）
-trend = data["sales_trend"].sort_values("date").reset_index(drop=True).copy()
-trend["月份"] = trend["date"].dt.strftime("%Y-%m")
 
-tr = kpi_mod.sales_trend_kpis(data["sales_trend"])
+def _last_two(df, date_col, val_col):
+    d = df.sort_values(date_col).reset_index(drop=True)
+    if len(d) < 2:
+        return None, None
+    return d.iloc[-1][val_col], d.iloc[-2][val_col]
 
 
 def _delta(cur, prev):
@@ -34,19 +41,37 @@ def _delta(cur, prev):
     return round((cur - prev) / abs(prev) * 100, 1)
 
 
+# ---- 销量/销售额趋势源：US/DE 用售出件数趋势，CA/FR 降级用市场趋势 ----
+sales_trend = data["sales_trend"]
+if sales_trend is not None:
+    trend = sales_trend.sort_values("date").reset_index(drop=True).copy()
+    trend["月份"] = trend["date"].dt.strftime("%Y-%m")
+    x_col, sales_col, rev_col = "月份", "售出件数", "净销售额($)"
+    sales_lbl, rev_lbl = "售出件数", "净销售额"
+else:
+    st.info("该站点无「售出件数趋势」，改用市场趋势的类目销量/销售额（口径略有差异）。")
+    trend = data["market_trend"].copy()
+    trend["月份"] = trend["月份"].astype(str)
+    trend = trend.sort_values("月份").reset_index(drop=True)
+    x_col, sales_col, rev_col = "月份", "类目销量", "类目销售额"
+    sales_lbl, rev_lbl = "类目销量", "类目销售额"
+
+cur_sales, prev_sales = _last_two(trend, x_col, sales_col)
+cur_rev, prev_rev = _last_two(trend, x_col, rev_col)
+
 # ---- KPI 卡片（当月 + 上月 + 环比） ----
 ui.kpi_cards([
     {
-        "label": "市场月销量",
-        "value": fmt.compact(tr["当月销量"]),
-        "sub": f"上月 {fmt.compact(tr['上月销量'])}",
-        "delta": _delta(tr["当月销量"], tr["上月销量"]),
+        "label": f"市场月销量（{sales_lbl}）",
+        "value": fmt.compact(cur_sales),
+        "sub": f"上月 {fmt.compact(prev_sales)}",
+        "delta": _delta(cur_sales, prev_sales),
     },
     {
-        "label": "市场月销售额",
-        "value": fmt.compact_usd(tr["当月销售额"]),
-        "sub": f"上月 {fmt.compact_usd(tr['上月销售额'])}",
-        "delta": _delta(tr["当月销售额"], tr["上月销售额"]),
+        "label": f"市场月销售额（{rev_lbl}）",
+        "value": fmt.money_compact(cur_rev, cur),
+        "sub": f"上月 {fmt.money_compact(prev_rev, cur)}",
+        "delta": _delta(cur_rev, prev_rev),
     },
     {"label": "品牌数", "value": fmt.thousands(asin_summary["品牌数量"])},
     {"label": "ASIN数(Top100)", "value": fmt.thousands(asin_summary["产品数"])},
@@ -56,23 +81,23 @@ ui.kpi_cards([
 # ---- 图1：销量 / 销售额趋势（双轴） ----
 ui.section("1. 市场销量 & 销售额趋势")
 charts.line(
-    trend, x="月份", y="售出件数", y2="净销售额($)",
-    title="月度售出件数 vs 净销售额",
+    trend, x=x_col, y=sales_col, y2=rev_col,
+    title=f"月度{sales_lbl} vs {rev_lbl}",
 )
 
 # ---- 图2：环比 / 同比 ----
 ui.section("2. 环比（按月） & 同比（按年）")
-mom_yoy = kpi_mod.mom_yoy_table(trend, "售出件数", date_col="月份")
+mom_yoy = kpi_mod.mom_yoy_table(trend, sales_col, date_col=x_col)
 c1, c2 = st.columns(2)
 with c1:
     charts.rise_fall_bar(
         mom_yoy["月份"].tolist(), mom_yoy["环比%"].tolist(),
-        title="销量环比 MoM（%）",
+        title=f"{sales_lbl}环比 MoM（%）",
     )
 with c2:
     charts.rise_fall_bar(
         mom_yoy["月份"].tolist(), mom_yoy["同比%"].tolist(),
-        title="销量同比 YoY（%）",
+        title=f"{sales_lbl}同比 YoY（%）",
     )
 
 # ---- 图3：全球市场 & 价格带 ----
@@ -84,17 +109,20 @@ with c3:
 with c4:
     charts.histogram(data["asin"]["detail"], x="实际价格($)", title="价格带分布", nbins=30)
 
-# ---- 图4：品牌份额 & Top10 ----
+# ---- 图4：品牌份额 & Top10（品牌销量仅 US 有） ----
 ui.section("4. 品牌份额 & Top10 品牌")
-c5, c6 = st.columns(2)
-with c5:
-    charts.treemap(
-        data["brand"], path="品牌名称", values="品牌产品listing月销额($)",
-        title="品牌销售额 Treemap",
-    )
-with c6:
-    top10 = data["brand"].nlargest(10, "品牌产品listing月销额($)")
-    charts.hbar(top10, x="品牌产品listing月销额($)", y="品牌名称", title="Top10 品牌月销额")
+if data["brand"] is not None:
+    c5, c6 = st.columns(2)
+    with c5:
+        charts.treemap(
+            data["brand"], path="品牌名称", values="品牌产品listing月销额($)",
+            title="品牌销售额 Treemap",
+        )
+    with c6:
+        top10 = data["brand"].nlargest(10, "品牌产品listing月销额($)")
+        charts.hbar(top10, x="品牌产品listing月销额($)", y="品牌名称", title="Top10 品牌月销额")
+else:
+    st.info("该站点无品牌销量数据（品牌销量仅 US 有）。")
 
 # ---- 图5：Top20 产品（含 ASIN + 链接） ----
 ui.section("5. Top20 产品")
@@ -109,9 +137,9 @@ st.dataframe(
     hide_index=True,
     column_config={
         "URL": st.column_config.LinkColumn("链接", display_text="Amazon ↗"),
-        "实际价格($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "实际价格($)": st.column_config.NumberColumn(format=cfmt),
         "预计Listing月销量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
-        "Listing月销售额($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "Listing月销售额($)": st.column_config.NumberColumn(format=cfmt),
         "评分星级": st.column_config.NumberColumn(format="%.1f"),
         "评价数量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
     },

@@ -7,7 +7,15 @@ from components import ui
 
 ui.page_title("BSR ASIN 竞争分析")
 
-data = load_all()
+site = ui.site_selector()
+data = load_all(site)
+cur = data["currency"]
+cfmt = data["currency_fmt"]
+
+if data["asin"] is None:
+    st.info("该站点无 ASIN 产品列表数据。")
+    st.stop()
+
 detail = data["asin"]["detail"]
 summ = kpi_mod.summary_kpis(data["asin"]["summary"])
 
@@ -15,8 +23,8 @@ summ = kpi_mod.summary_kpis(data["asin"]["summary"])
 ui.kpi_cards([
     {"label": "产品数", "value": fmt.thousands(summ["产品数"])},
     {"label": "月总销量", "value": fmt.compact(summ["月总销量"])},
-    {"label": "月总销售额", "value": fmt.compact_usd(summ["月总销售额($)"])},
-    {"label": "平均价格", "value": fmt.usd(summ["平均价格($)"])},
+    {"label": "月总销售额", "value": fmt.money_compact(summ["月总销售额($)"], cur)},
+    {"label": "平均价格", "value": fmt.money(summ["平均价格($)"], cur)},
     {"label": "平均星级", "value": f'{summ["平均星级"]:.1f}' if summ["平均星级"] else "—"},
 ])
 
@@ -109,13 +117,13 @@ st.dataframe(
     width="stretch",
     hide_index=True,
     column_config={
-        "实际价格($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "实际价格($)": st.column_config.NumberColumn(format=cfmt),
         "预计Listing月销量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
-        "Listing月销售额($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "Listing月销售额($)": st.column_config.NumberColumn(format=cfmt),
         "评分星级": st.column_config.NumberColumn(format="%.1f"),
         "评价数量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
         "上架天数": st.column_config.NumberColumn(format=fmt.NUM_FMT),
-        "单个产品毛利($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "单个产品毛利($)": st.column_config.NumberColumn(format=cfmt),
         "单个产品毛利率(%)": st.column_config.NumberColumn(format=fmt.PCT_FMT),
         "上架时间": st.column_config.DateColumn(format="YYYY-MM-DD"),
     },

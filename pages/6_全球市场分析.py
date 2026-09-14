@@ -1,4 +1,4 @@
-"""全球市场对比分析（14 个站点）。"""
+"""全球市场对比分析（14 个站点，跨站点数据，与当前选中站点无关）。"""
 import streamlit as st
 
 from utils import charts, formatters as fmt
@@ -7,7 +7,8 @@ from components import ui
 
 ui.page_title("全球市场对比分析")
 
-data = load_all()
+# 全球对比为跨站点数据，与侧边栏站点无关，固定加载即可
+data = load_all("US")
 g = data["global"]
 
 has_data = g[g["是否有数据"]]

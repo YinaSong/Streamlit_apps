@@ -93,3 +93,27 @@ def fmt_year_month(ym) -> str:
     if len(s) == 6 and s.isdigit():
         return f"{s[:4]}-{s[4:]}"
     return s
+
+
+def money(x, cur: str = "$") -> str:
+    """按站点币种格式化金额：money(1234.5, '€') -> '€1,234.50'。"""
+    if _isna(x):
+        return NA
+    return f"{cur}{float(x):,.2f}"
+
+
+def money_compact(x, cur: str = "$") -> str:
+    """按站点币种缩写金额：money_compact(1.2e5, 'CA$') -> 'CA$12.0万'。"""
+    if _isna(x):
+        return NA
+    x = float(x)
+    if abs(x) >= 1e8:
+        return f"{cur}{x / 1e8:.2f}亿"
+    if abs(x) >= 1e4:
+        return f"{cur}{x / 1e4:.1f}万"
+    return f"{cur}{x:,.0f}"
+
+
+def currency_fmt(cur: str = "$") -> str:
+    """站点币种的 NumberColumn 格式串：currency_fmt('€') -> '€%,.2f'。"""
+    return f"{cur}%,.2f"

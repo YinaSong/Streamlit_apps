@@ -10,7 +10,8 @@ ui.page_title(
     "参考 Power BI 类目报告的分析角度：规模趋势 · 季节性 · 同比环比增速",
 )
 
-data = load_all()
+site = ui.site_selector()
+data = load_all(site)
 mt = data["market_trend"].copy()
 meta = data["market_meta"]
 
@@ -20,7 +21,7 @@ mt = mt.sort_values("月份").reset_index(drop=True)
 
 # ---- 头部：类目元信息 + 数据截至 ----
 meta_text = (
-    f"类目：{meta.get('类目名称', '—')} · {meta.get('一级大类', '—')} · NODEID {meta.get('NODEID', '—')}"
+    f"类目：{meta.get('类目名称', '—')} · {meta.get('一级大类', '—')} · NODEID {meta.get('NODEID', '—')} · 站点 {site}"
 )
 latest = fmt.fmt_year_month(mt["月份"].iloc[-1])
 ui.data_source(f"{meta_text} · 数据截至 {latest}（最近月份数据可能未完整统计）")
@@ -83,8 +84,16 @@ metric_groups = {
     "竞争": ["平均品牌数量", "平均卖家数量", "平均大类排名"],
     "流量": ["核心词流量"],
     "利润": ["平均单个利润"],
+    "集中度": ["Top100产品占有率(%)", "亚马逊自营占比(%)",
+               "1个月新产品占比(%)", "3个月新产品占比(%)", "6个月新产品占比(%)"],
 }
-all_metrics = [m for v in metric_groups.values() for m in v]
+# 只保留当前站点实际存在的指标（如 FR 无「核心词流量」）
+available_groups = {}
+for group, cols in metric_groups.items():
+    present = [c for c in cols if c in mt.columns]
+    if present:
+        available_groups[group] = present
+all_metrics = [m for cols in available_groups.values() for m in cols]
 selected = st.multiselect(
     "选择要展示的指标", all_metrics, default=["类目销量", "类目销售额"],
 )
@@ -108,6 +117,14 @@ with c5:
     charts.line(view, x="月份", y="平均品牌数量", title="平均品牌数量趋势")
 with c6:
     charts.line(view, x="月份", y="平均卖家数量", title="平均卖家数量趋势")
+
+# ---- 模块 G：集中度与自营占比 ----
+ui.section("G. 集中度与自营占比")
+c7, c8 = st.columns(2)
+with c7:
+    charts.line(view, x="月份", y="Top100产品占有率(%)", title="Top100 产品占有率趋势")
+with c8:
+    charts.line(view, x="月份", y="亚马逊自营占比(%)", title="亚马逊自营占比趋势")
 
 # ---- 原始数据 ----
 ui.section("原始数据表")

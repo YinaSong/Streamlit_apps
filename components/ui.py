@@ -18,6 +18,16 @@ def page_title(title: str, subtitle: str | None = None):
         st.caption(subtitle)
 
 
+def site_selector() -> str:
+    """侧边栏站点切换器（US/CA/DE/FR）。
+
+    key="site" 固定 + st.session_state 跨页共享：用户切换一次，全程生效。
+    每页在 load_all(site) 前调用一次即可。
+    """
+    from utils.data_loader import SITES
+    return st.sidebar.segmented_control("站点", SITES, key="site", default="US")
+
+
 def data_source(text: str):
     """数据时间来源说明（标题下方灰色小字）。"""
     st.markdown(

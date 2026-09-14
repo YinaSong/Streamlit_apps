@@ -1,4 +1,4 @@
-"""BSR 品牌竞争分析。"""
+"""BSR 品牌竞争分析（品牌销量仅 US 有）。"""
 import streamlit as st
 
 from utils import charts, formatters as fmt, kpi as kpi_mod
@@ -7,8 +7,15 @@ from components import ui
 
 ui.page_title("BSR 品牌竞争分析")
 
-data = load_all()
+site = ui.site_selector()
+data = load_all(site)
+cur = data["currency"]
+cfmt = data["currency_fmt"]
 brand = data["brand"]
+
+if brand is None:
+    st.info("该站点无品牌销量数据（品牌销量仅 US 有），本页降级为空。")
+    st.stop()
 
 # ---- KPI（占比第一品牌 + AOSU） ----
 b = kpi_mod.brand_kpis(brand)
@@ -16,9 +23,9 @@ ui.kpi_cards([
     {"label": "品牌数量", "value": fmt.thousands(b["品牌数量"])},
     {"label": "CR10(销量份额)", "value": f'{b["CR10销量份额%"]}%'},
     {"label": "占比第一品牌", "value": b["Top品牌"],
-     "sub": f'销售额份额 {b["Top品牌销售额份额%"]}% · {fmt.compact_usd(b["Top品牌销售额"])}'},
-    {"label": "AOSU", "value": f'排名 #{b["AOSU排名"]}',
-     "sub": f'销售额份额 {b["AOSU销售额份额%"]}% · {fmt.compact_usd(b["AOSU销售额"])}'},
+     "sub": f'销售额份额 {b["Top品牌销售额份额%"]}% · {fmt.money_compact(b["Top品牌销售额"], cur)}'},
+    {"label": "AOSU", "value": f'排名 #{b.get("AOSU排名", "—")}',
+     "sub": f'销售额份额 {b.get("AOSU销售额份额%", "—")}% · {fmt.money_compact(b.get("AOSU销售额"), cur)}'},
 ])
 
 # ---- 排行 ----
@@ -70,7 +77,7 @@ st.dataframe(
     hide_index=True,
     column_config={
         "品牌产品listing月销量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
-        "品牌产品listing月销额($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "品牌产品listing月销额($)": st.column_config.NumberColumn(format=cfmt),
         "市场份额-产品销量份额占比(%)": st.column_config.NumberColumn(format=fmt.PCT_FMT),
         "市场份额-产品销售额份额占比(%)": st.column_config.NumberColumn(format=fmt.PCT_FMT),
         "品牌下新品份额(%)": st.column_config.NumberColumn(format=fmt.PCT_FMT),

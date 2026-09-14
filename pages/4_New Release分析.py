@@ -1,4 +1,4 @@
-"""New Release 新品机会分析。"""
+"""New Release 新品机会分析（仅 US 有）。"""
 import streamlit as st
 
 from utils import charts, formatters as fmt, kpi as kpi_mod
@@ -7,8 +7,16 @@ from components import ui
 
 ui.page_title("New Release 新品分析")
 
-data = load_all()
+site = ui.site_selector()
+data = load_all(site)
+cur = data["currency"]
+cfmt = data["currency_fmt"]
 nr = data["new_release"]
+
+if nr is None:
+    st.info("该站点无 New Release 产品列表数据（仅 US 有），本页降级为空。")
+    st.stop()
+
 detail = nr["detail"]
 variants = nr["variants"]
 summ = kpi_mod.summary_kpis(nr["summary"])
@@ -17,9 +25,9 @@ summ = kpi_mod.summary_kpis(nr["summary"])
 ui.kpi_cards([
     {"label": "新品数量", "value": fmt.thousands(summ["产品数"])},
     {"label": "新品月总销量", "value": fmt.compact(summ["月总销量"])},
-    {"label": "新品月总销售额", "value": fmt.compact_usd(summ["月总销售额($)"])},
+    {"label": "新品月总销售额", "value": fmt.money_compact(summ["月总销售额($)"], cur)},
     {"label": "新品占比", "value": fmt.percent(summ["新品占比(%)(默认三个月)"])},
-    {"label": "平均价格", "value": fmt.usd(summ["平均价格($)"])},
+    {"label": "平均价格", "value": fmt.money(summ["平均价格($)"], cur)},
     {"label": "平均星级", "value": f'{summ["平均星级"]:.1f}' if summ["平均星级"] is not None else "—"},
 ])
 
@@ -60,7 +68,7 @@ with c6:
 
 # ---- 属性词挖掘 ----
 ui.section("4. 属性词挖掘（新品卖点/属性）")
-attr_cols = ["五点描述", "Special Feature", "Connectivity Technology",
+attr_cols = ["Special Feature", "Connectivity Technology",
              "Indoor/Outdoor Usage", "Recommended Uses For Product"]
 attr = kpi_mod.attr_words(detail, attr_cols)
 c7, c8 = st.columns(2)
@@ -80,9 +88,9 @@ st.dataframe(
     width="stretch",
     hide_index=True,
     column_config={
-        "实际价格($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "实际价格($)": st.column_config.NumberColumn(format=cfmt),
         "预计Listing月销量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
-        "Listing月销售额($)": st.column_config.NumberColumn(format=fmt.USD_FMT),
+        "Listing月销售额($)": st.column_config.NumberColumn(format=cfmt),
         "评分星级": st.column_config.NumberColumn(format="%.1f"),
         "评价数量": st.column_config.NumberColumn(format=fmt.NUM_FMT),
         "上架天数": st.column_config.NumberColumn(format=fmt.NUM_FMT),

@@ -63,12 +63,16 @@ def brand_kpis(df: pd.DataFrame) -> dict:
 
 
 def keyword_kpis(df: pd.DataFrame) -> dict:
-    """关键词页 KPI：数量、平均搜索量、平均竞争度。"""
+    """关键词页 KPI：数量、平均搜索量、平均竞争度。
+
+    注意：CA 的关键词表无 cpc 竞价列，此时平均 CPC 返回 None（页面显示 —）。
+    """
+    cpc = df["cpc精准竞价($)"].mean() if "cpc精准竞价($)" in df.columns else None
     return {
         "关键词数量": len(df),
         "平均月搜索量": _clean(df["月搜索量"].mean()),
         "平均竞品数量": _clean(df["竞品数量"].mean()),
-        "平均CPC($)": _clean(df["cpc精准竞价($)"].mean()),
+        "平均CPC($)": _clean(cpc),
     }
 
 
